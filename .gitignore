@@ -2,3 +2,5 @@
 .vercel/
 .claude/
 .vercel
+.env*.local
+node_modules/

@@ -49,12 +49,13 @@ const SKY_FRAG = /* glsl */ `
   }
 `;
 
+// The world scrolls along -x past the bird. Camera watches from +z.
 export class World {
   constructor(scene) {
     this.scene = scene;
-    this.sunDir = new THREE.Vector3(0.35, 0.22, -0.85).normalize();
+    // sun sits ahead of the bird and behind the gates, in frame
+    this.sunDir = new THREE.Vector3(0.3, 0.18, -0.92).normalize();
 
-    // working colors, lerped each frame
     this.cols = {};
     for (const k of ['zenith', 'horizon', 'sun', 'fog', 'hemiSky', 'hemiGround', 'dir', 'ocean', 'cloud']) {
       this.cols[k] = new THREE.Color();
@@ -63,13 +64,15 @@ export class World {
     this._b = new THREE.Color();
     this.night = 0;
 
-    scene.fog = new THREE.Fog(0xf08a60, 60, 240);
+    scene.fog = new THREE.Fog(0xf08a60, 60, 230);
 
     this.buildSky();
     this.buildLights();
     this.buildOcean();
     this.buildClouds();
     this.buildMountains();
+    this.buildIslands();
+    this.buildFlock();
     this.buildStars();
     this.applyPalette(0);
   }
@@ -99,7 +102,7 @@ export class World {
   }
 
   buildOcean() {
-    const geo = new THREE.PlaneGeometry(620, 460, 56, 38);
+    const geo = new THREE.PlaneGeometry(700, 380, 64, 34);
     geo.rotateX(-Math.PI / 2);
     this.oceanGeo = geo;
     this.oceanBase = geo.attributes.position.array.slice();
@@ -108,7 +111,7 @@ export class World {
       emissive: 0x14445c, emissiveIntensity: 0.45,
     });
     const ocean = new THREE.Mesh(geo, this.oceanMat);
-    ocean.position.set(0, -8.2, -120);
+    ocean.position.set(0, -8.2, -70);
     this.scene.add(ocean);
   }
 
@@ -130,25 +133,99 @@ export class World {
         cluster.add(puff);
       }
       cluster.position.set(
-        (Math.random() - 0.5) * 130,
-        6 + Math.random() * 16,
-        -300 + Math.random() * 320
+        -170 + Math.random() * 340,
+        7 + Math.random() * 15,
+        -130 + Math.random() * 130
       );
-      cluster.userData.drift = 0.3 + Math.random() * 0.5;
+      cluster.userData.par = 0.25 + Math.random() * 0.45; // parallax factor
       this.scene.add(cluster);
       this.clouds.push(cluster);
     }
   }
 
   buildMountains() {
+    this.mountains = [];
     const mat = new THREE.MeshStandardMaterial({ color: 0x2a3050, roughness: 1, flatShading: true });
-    for (let i = 0; i < 9; i++) {
-      const h = 16 + Math.random() * 26;
-      const m = new THREE.Mesh(new THREE.ConeGeometry(10 + Math.random() * 14, h, 5), mat);
-      const side = i % 2 === 0 ? -1 : 1;
-      m.position.set(side * (26 + Math.random() * 60), -8 + h / 2, -160 - Math.random() * 90);
+    for (let i = 0; i < 11; i++) {
+      const h = 18 + Math.random() * 30;
+      const m = new THREE.Mesh(new THREE.ConeGeometry(12 + Math.random() * 16, h, 5), mat);
+      m.position.set(-160 + Math.random() * 320, -8 + h / 2, -90 - Math.random() * 90);
       m.rotation.y = Math.random() * Math.PI;
       this.scene.add(m);
+      this.mountains.push(m);
+    }
+  }
+
+  buildIslands() {
+    this.islands = [];
+    const rockMat = new THREE.MeshStandardMaterial({
+      color: 0x5e5276, roughness: 0.95, flatShading: true,
+      emissive: 0x3a3050, emissiveIntensity: 0.45,
+    });
+    const grassMat = new THREE.MeshStandardMaterial({
+      color: 0x7eb86a, roughness: 0.9, flatShading: true,
+      emissive: 0x4a7a3e, emissiveIntensity: 0.35,
+    });
+    const trunkMat = new THREE.MeshStandardMaterial({ color: 0x6b4a3a, roughness: 1, flatShading: true });
+    const pineMat = new THREE.MeshStandardMaterial({
+      color: 0x3e8a62, roughness: 0.9, flatShading: true,
+      emissive: 0x1e5a3e, emissiveIntensity: 0.3,
+    });
+
+    for (let i = 0; i < 6; i++) {
+      const g = new THREE.Group();
+      const r = 2.4 + Math.random() * 2;
+      const depth = 3 + Math.random() * 3;
+
+      const rock = new THREE.Mesh(new THREE.ConeGeometry(r, depth, 6), rockMat);
+      rock.rotation.x = Math.PI; // point hangs downward
+      rock.position.y = -depth / 2;
+      g.add(rock);
+
+      const cap = new THREE.Mesh(new THREE.CylinderGeometry(r * 1.04, r * 1.04, 0.55, 6), grassMat);
+      cap.position.y = 0.27;
+      g.add(cap);
+
+      const trees = 1 + Math.floor(Math.random() * 3);
+      for (let t = 0; t < trees; t++) {
+        const a = Math.random() * Math.PI * 2;
+        const d = Math.random() * r * 0.5;
+        const tx = Math.cos(a) * d;
+        const tz = Math.sin(a) * d;
+        const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.09, 0.14, 0.5, 5), trunkMat);
+        trunk.position.set(tx, 0.8, tz);
+        const pine = new THREE.Mesh(new THREE.ConeGeometry(0.5, 1.4, 6), pineMat);
+        pine.position.set(tx, 1.7, tz);
+        g.add(trunk, pine);
+      }
+
+      const s = 0.8 + Math.random() * 0.7;
+      g.scale.set(s, s, s);
+      g.position.set(-150 + Math.random() * 300, 3.5 + Math.random() * 9, -35 - Math.random() * 55);
+      g.userData = { baseY: g.position.y, phase: Math.random() * Math.PI * 2 };
+      g.rotation.y = Math.random() * Math.PI;
+      this.scene.add(g);
+      this.islands.push(g);
+    }
+  }
+
+  buildFlock() {
+    this.flock = [];
+    const mat = new THREE.MeshBasicMaterial({ color: 0x1a1430, side: THREE.DoubleSide });
+    // a shallow V of two triangles, facing the camera
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array([
+      -1, 0.3, 0,  -0.5, 0, 0,  0, 0.14, 0,
+       0, 0.14, 0,  0.5, 0, 0,  1, 0.3, 0,
+    ]), 3));
+    for (let i = 0; i < 7; i++) {
+      const b = new THREE.Mesh(geo, mat);
+      const s = 0.5 + Math.random() * 0.5;
+      b.scale.set(s, s, s);
+      b.position.set(-120 + Math.random() * 240, 7 + Math.random() * 9, -45 - Math.random() * 25);
+      b.userData = { phase: Math.random() * Math.PI * 2, baseScale: s };
+      this.scene.add(b);
+      this.flock.push(b);
     }
   }
 
@@ -156,9 +233,8 @@ export class World {
     const count = 450;
     const pos = new Float32Array(count * 3);
     for (let i = 0; i < count; i++) {
-      // random point on upper dome
       const theta = Math.random() * Math.PI * 2;
-      const phi = Math.acos(Math.random() * 0.85); // bias toward zenith
+      const phi = Math.acos(Math.random() * 0.85);
       const r = 390;
       pos[i * 3] = r * Math.sin(phi) * Math.cos(theta);
       pos[i * 3 + 1] = r * Math.cos(phi) + 4;
@@ -173,7 +249,6 @@ export class World {
     this.scene.add(new THREE.Points(geo, this.starMat));
   }
 
-  // t: continuous palette position (score / 8). Crossfades between moods.
   applyPalette(t) {
     const n = PALETTES.length;
     const idx = Math.floor(t) % n;
@@ -203,7 +278,8 @@ export class World {
     this.starMat.opacity = this.night * 0.95;
   }
 
-  update(dt, elapsed, paletteT) {
+  // scroll = world-units the foreground moved this frame (speed * dt)
+  update(dt, elapsed, paletteT, scroll) {
     this.applyPalette(paletteT);
 
     // rolling low-poly waves
@@ -220,13 +296,35 @@ export class World {
     pos.needsUpdate = true;
     this.oceanGeo.computeVertexNormals();
 
-    // drifting clouds
+    // parallax layers, nearest moves fastest
     for (const c of this.clouds) {
-      c.position.z += c.userData.drift * dt * 10;
-      if (c.position.z > 40) {
-        c.position.z = -300;
-        c.position.x = (Math.random() - 0.5) * 130;
-        c.position.y = 6 + Math.random() * 16;
+      c.position.x -= scroll * c.userData.par + dt * 0.8;
+      if (c.position.x < -190) {
+        c.position.x = 190;
+        c.position.y = 7 + Math.random() * 15;
+        c.position.z = -130 + Math.random() * 130;
+      }
+    }
+    for (const m of this.mountains) {
+      m.position.x -= scroll * 0.08;
+      if (m.position.x < -180) m.position.x = 180;
+    }
+    for (const isl of this.islands) {
+      isl.position.x -= scroll * 0.28;
+      isl.position.y = isl.userData.baseY + Math.sin(elapsed * 0.5 + isl.userData.phase) * 0.5;
+      if (isl.position.x < -160) {
+        isl.position.x = 160;
+        isl.userData.baseY = 3.5 + Math.random() * 9;
+        isl.position.z = -35 - Math.random() * 55;
+      }
+    }
+    for (const b of this.flock) {
+      b.position.x -= scroll * 0.45 + dt * 1.4;
+      b.position.y += Math.sin(elapsed * 2 + b.userData.phase) * dt * 0.6;
+      b.scale.y = b.userData.baseScale * (0.35 + Math.abs(Math.sin(elapsed * 6 + b.userData.phase)) * 0.85);
+      if (b.position.x < -130) {
+        b.position.x = 130;
+        b.position.y = 7 + Math.random() * 9;
       }
     }
   }

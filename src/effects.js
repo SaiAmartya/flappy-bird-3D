@@ -1,12 +1,74 @@
 import * as THREE from 'three';
 
-// Particle bursts, score rings, and camera shake.
+const TRAIL_N = 42;
+
+const TRAIL_VERT = /* glsl */ `
+  attribute float aAge;
+  varying float vAge;
+  void main() {
+    vAge = aAge;
+    vec4 mv = modelViewMatrix * vec4(position, 1.0);
+    gl_PointSize = ((1.0 - aAge) * 9.0 + 2.0) * (140.0 / -mv.z);
+    gl_Position = projectionMatrix * mv;
+  }
+`;
+
+const TRAIL_FRAG = /* glsl */ `
+  varying float vAge;
+  uniform vec3 uColor;
+  void main() {
+    float d = length(gl_PointCoord - 0.5);
+    float alpha = smoothstep(0.5, 0.12, d) * (1.0 - vAge) * 0.5;
+    gl_FragColor = vec4(uColor, alpha);
+  }
+`;
+
+// Particle bursts, score rings, flight trail, and camera shake.
 export class Effects {
   constructor(scene) {
     this.scene = scene;
     this.bursts = [];
     this.rings = [];
     this.shake = 0;
+    this.buildTrail();
+  }
+
+  buildTrail() {
+    const positions = new Float32Array(TRAIL_N * 3);
+    const ages = new Float32Array(TRAIL_N).fill(1);
+    positions.fill(-500); // start hidden
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    geo.setAttribute('aAge', new THREE.BufferAttribute(ages, 1));
+    const mat = new THREE.ShaderMaterial({
+      uniforms: { uColor: { value: new THREE.Color(0xffd9a0) } },
+      vertexShader: TRAIL_VERT,
+      fragmentShader: TRAIL_FRAG,
+      transparent: true,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+    });
+    this.trail = new THREE.Points(geo, mat);
+    this.trail.frustumCulled = false;
+    this.trailHead = 0;
+    this.trailTimer = 0;
+    this.scene.add(this.trail);
+  }
+
+  emitTrail(pos, dt) {
+    this.trailTimer -= dt;
+    if (this.trailTimer > 0) return;
+    this.trailTimer = 0.028;
+    const i = this.trailHead = (this.trailHead + 1) % TRAIL_N;
+    const p = this.trail.geometry.attributes.position;
+    p.setXYZ(i, pos.x, pos.y, pos.z);
+    p.needsUpdate = true;
+    this.trail.geometry.attributes.aAge.array[i] = 0;
+  }
+
+  clearTrail() {
+    this.trail.geometry.attributes.aAge.array.fill(1);
+    this.trail.geometry.attributes.aAge.needsUpdate = true;
   }
 
   burst(pos, { count = 50, color = 0xfff6ec, speed = 7, life = 1.3, size = 0.26, gravity = -9 } = {}) {
@@ -56,6 +118,18 @@ export class Effects {
 
   update(dt, rawDt) {
     this.shake *= Math.exp(-rawDt * 4.5);
+
+    // trail particles age out, drifting back with the world
+    const ages = this.trail.geometry.attributes.aAge;
+    const tpos = this.trail.geometry.attributes.position;
+    for (let i = 0; i < TRAIL_N; i++) {
+      if (ages.array[i] < 1) {
+        ages.array[i] = Math.min(1, ages.array[i] + dt * 1.4);
+        tpos.array[i * 3] -= dt * 5; // fall behind the bird
+      }
+    }
+    ages.needsUpdate = true;
+    tpos.needsUpdate = true;
 
     for (let i = this.bursts.length - 1; i >= 0; i--) {
       const b = this.bursts[i];

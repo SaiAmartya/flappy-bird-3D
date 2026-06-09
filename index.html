@@ -33,6 +33,10 @@
       <h1 class="title">AETHER<span>WING</span></h1>
       <p class="tagline">a 3D flappy odyssey</p>
       <div class="chip">BEST &nbsp;<strong id="menu-best">0</strong></div>
+      <div class="lb">
+        <p class="lb-title">🏆 top pilots — worldwide</p>
+        <ol class="lb-list" id="menu-lb-list"><li class="lb-empty">tuning in…</li></ol>
+      </div>
       <p class="instructions">
         <span class="key">space</span> · <span class="key">click</span> · <span class="key">tap</span> — to flap
       </p>
@@ -50,6 +54,15 @@
           <span class="stat-label">BEST</span>
           <span class="stat-value gold" id="final-best">0</span>
         </div>
+      </div>
+      <div id="submit-row" class="hidden">
+        <input id="pilot-name" maxlength="16" placeholder="your call sign" autocomplete="off" spellcheck="false" />
+        <button id="submit-btn">etch it</button>
+      </div>
+      <p id="submit-status"></p>
+      <div class="lb">
+        <p class="lb-title">🏆 top pilots</p>
+        <ol class="lb-list" id="over-lb-list"><li class="lb-empty">tuning in…</li></ol>
       </div>
       <p class="instructions"><span class="key">space</span> to soar again</p>
       <p class="newbest hidden" id="newbest">★ new best flight ★</p>

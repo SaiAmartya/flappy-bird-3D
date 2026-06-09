@@ -1,13 +1,15 @@
 import * as THREE from 'three';
 
-const SPACING = 26;
-const COUNT = 7;
-const FIRST_Z = -70;
+// Gates approach from the right (+x) and sweep past the bird at x = 0,
+// so the side-on camera reads their heights as they come.
+const SPACING = 16;
+const COUNT = 8;
+const FIRST_X = 55;
+const RECYCLE_X = -34;
 const FLOOR_BASE = -9.5;
 const CEIL_BASE = 19;
 const COL_RADIUS = 1.35;
 
-// Crystal gate columns rising from the sea and hanging from the sky.
 export class Obstacles {
   constructor(scene, config) {
     this.config = config;
@@ -28,7 +30,7 @@ export class Obstacles {
     });
 
     this.pairs = [];
-    for (let i = 0; i < COUNT; i++) this.pairs.push(this.makePair(i));
+    for (let i = 0; i < COUNT; i++) this.pairs.push(this.makePair());
     this.lastScored = null;
     this.reset();
   }
@@ -42,7 +44,6 @@ export class Obstacles {
     if (!up) tip.rotation.x = Math.PI;
     col.add(prism, tip);
 
-    // small glowing shards near the gate mouth
     const shards = new THREE.Group();
     for (let s = 0; s < 3; s++) {
       const shard = new THREE.Mesh(new THREE.ConeGeometry(0.22, 0.9 + Math.random() * 0.7, 5), this.crystalDim);
@@ -57,7 +58,7 @@ export class Obstacles {
     return col;
   }
 
-  makePair(i) {
+  makePair() {
     const group = new THREE.Group();
     const bottom = this.makeColumn(true);
     const top = this.makeColumn(false);
@@ -65,12 +66,17 @@ export class Obstacles {
     top.rotation.y = Math.random() * Math.PI;
     group.add(bottom, top);
     this.group.add(group);
-    return { group, bottom, top, gapY: 2, gapHalf: 3.5, scored: false };
+    return {
+      group, bottom, top,
+      gapY: 2, gapHalf: 3.5, bob: 0,
+      bobPhase: Math.random() * Math.PI * 2,
+      scored: false,
+    };
   }
 
   setColumn(col, gapEdgeY) {
     const { prism, tip, shards, up } = col.userData;
-    // tip apex sits exactly at the gap edge
+    // tip apex sits exactly at the gap edge — what you see is the hitbox
     tip.position.y = gapEdgeY + (up ? -0.85 : 0.85);
     const prismTop = gapEdgeY + (up ? -1.5 : 1.5);
     const base = up ? FLOOR_BASE : CEIL_BASE;
@@ -92,25 +98,32 @@ export class Obstacles {
 
   reset() {
     this.pairs.forEach((pair, i) => {
-      pair.group.position.z = FIRST_Z - i * SPACING;
+      pair.group.position.x = FIRST_X + i * SPACING;
+      pair.group.position.y = 0;
       this.configure(pair, 0);
     });
   }
 
-  // Advance by dz; returns how many gates were passed this frame.
-  update(dz, score) {
+  // Advance the gates by dist; returns how many were passed this frame.
+  update(dist, dt, score, elapsed) {
     let passed = 0;
     for (const pair of this.pairs) {
-      pair.group.position.z += dz;
-      if (!pair.scored && pair.group.position.z > 2.4) {
+      pair.group.position.x -= dist;
+      // gates drift gently on the aether — collision includes the bob
+      pair.bob = Math.sin(elapsed * 0.85 + pair.bobPhase) * 0.3;
+      pair.group.position.y = pair.bob;
+      pair.bottom.rotation.y += dt * 0.1;
+      pair.top.rotation.y -= dt * 0.1;
+
+      if (!pair.scored && pair.group.position.x < -2.5) {
         pair.scored = true;
         passed++;
         this.lastScored = pair;
       }
-      if (pair.group.position.z > 34) {
-        let minZ = Infinity;
-        for (const p of this.pairs) minZ = Math.min(minZ, p.group.position.z);
-        pair.group.position.z = minZ - SPACING;
+      if (pair.group.position.x < RECYCLE_X) {
+        let maxX = -Infinity;
+        for (const p of this.pairs) maxX = Math.max(maxX, p.group.position.x);
+        pair.group.position.x = maxX + SPACING;
         this.configure(pair, score);
       }
     }
@@ -121,8 +134,9 @@ export class Obstacles {
   hits(y, radius) {
     const r = radius * 0.78;
     for (const pair of this.pairs) {
-      if (Math.abs(pair.group.position.z) < COL_RADIUS + r) {
-        if (y - r < pair.gapY - pair.gapHalf || y + r > pair.gapY + pair.gapHalf) {
+      if (Math.abs(pair.group.position.x) < COL_RADIUS + r) {
+        const gapY = pair.gapY + pair.bob;
+        if (y - r < gapY - pair.gapHalf || y + r > gapY + pair.gapHalf) {
           return true;
         }
       }
