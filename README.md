@@ -20,6 +20,7 @@
 | **A flock of strangers** | Tiny silhouette birds flap across the far background. The world is alive whether you fly or fall. |
 | **Cinematic death** | Feather bursts, a white flash, camera shake, and slow-motion easing to 0.14× time before the score panel rises. |
 | **Procedural audio** | Every sound — wing whoosh, pentatonic chimes that climb with your streak, the crash — is synthesized live with WebAudio. No audio files exist in this repo. |
+| **Generative soundtrack** | An ambient score (detuned pads, plucked arpeggios, soft bass over Am7 → Fmaj7 → Cmaj7 → G) is composed live by a lookahead scheduler. It brightens when you fly, ducks when you crash, and never repeats exactly. Mute it with the 🔊 button. |
 
 ## 🏆 Global leaderboard — and why you can('t) cheat it
 

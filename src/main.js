@@ -7,7 +7,7 @@ import { World } from './world.js';
 import { Bird } from './bird.js';
 import { Obstacles } from './obstacles.js';
 import { Effects } from './effects.js';
-import { SFX } from './audio.js';
+import { SFX, Music } from './audio.js';
 import { Leaderboard } from './leaderboard.js';
 
 const CONFIG = {
@@ -62,6 +62,7 @@ const bird = new Bird(scene);
 const obstacles = new Obstacles(scene, CONFIG);
 const effects = new Effects(scene);
 const sfx = new SFX();
+const music = new Music(sfx);
 const lb = new Leaderboard();
 
 // ── HUD ────────────────────────────────────────────────────────
@@ -73,6 +74,7 @@ const hud = {
   menuLbList: $('menu-lb-list'), overLbList: $('over-lb-list'),
   submitRow: $('submit-row'), pilotName: $('pilot-name'),
   submitBtn: $('submit-btn'), submitStatus: $('submit-status'),
+  muteBtn: $('mute-btn'),
 };
 
 // ── state ──────────────────────────────────────────────────────
@@ -111,6 +113,7 @@ function startGame() {
   hud.score.classList.remove('hidden');
   hud.score.textContent = '0';
   sfx.start();
+  music.setMood('playing');
   lb.beginSession(); // mint the flight token at takeoff
 }
 
@@ -127,6 +130,7 @@ function die() {
   deathT = 0;
   overShown = false;
   sfx.crash();
+  music.setMood('dead');
   effects.feathers(bird.group.position.clone());
   hud.flash.classList.remove('boom');
   void hud.flash.offsetWidth;
@@ -142,6 +146,7 @@ function die() {
 
 function showOver() {
   overShown = true;
+  music.setMood('menu');
   hud.finalScore.textContent = score;
   hud.finalBest.textContent = best;
   hud.score.classList.add('hidden');
@@ -196,6 +201,27 @@ async function submitScore() {
     : 'score recorded';
   lb.render(hud.overLbList, res.scores, name);
 }
+
+// ── audio boot & mute ──────────────────────────────────────────
+const MUTE_KEY = 'aetherwing-muted';
+let muted = localStorage.getItem(MUTE_KEY) === '1';
+sfx.setMuted(muted);
+hud.muteBtn.textContent = muted ? '🔇' : '🔊';
+
+hud.muteBtn.addEventListener('click', () => {
+  muted = !muted;
+  localStorage.setItem(MUTE_KEY, muted ? '1' : '0');
+  sfx.setMuted(muted);
+  hud.muteBtn.textContent = muted ? '🔇' : '🔊';
+  hud.muteBtn.blur(); // Space should flap, not re-toggle the button
+});
+
+// browsers gate audio behind a gesture — the soundtrack fades in on the
+// first interaction of any kind (registered before the flap handlers so
+// the menu music is already swelling when the first flight starts)
+const bootAudio = () => music.start();
+window.addEventListener('pointerdown', bootAudio, { once: true });
+window.addEventListener('keydown', bootAudio, { once: true });
 
 // ── input ──────────────────────────────────────────────────────
 function action() {
@@ -298,3 +324,6 @@ function tick() {
 }
 
 tick();
+
+// debug/E2E handle — lets tests verify audio + game state without UI scraping
+window.__aetherwing = { sfx, music, get state() { return state; } };

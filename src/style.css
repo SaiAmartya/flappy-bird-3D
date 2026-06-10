@@ -104,9 +104,12 @@ html, body {
 
 .title {
   font-family: "Climate Crisis", system-ui;
-  font-size: clamp(2.6rem, 10vw, 5.4rem);
+  font-size: clamp(2.2rem, 9.4vw, 5.4rem);
   line-height: 0.95;
-  margin: 0.18em 0 0.1em;
+  /* the headline is wider than the menu column — span the full
+     viewport so it stays optically centered instead of spilling right */
+  width: 100vw;
+  margin: 0.18em 0 0.1em calc(50% - 50vw);
   color: var(--ink);
   text-shadow:
     0 5px 0 rgba(255, 142, 94, 0.7),
@@ -339,6 +342,27 @@ html, body {
   letter-spacing: 0.18em;
   color: var(--gold);
 }
+
+/* ── mute toggle ── */
+#mute-btn {
+  position: absolute;
+  top: 2.4vh;
+  right: 2.4vw;
+  pointer-events: auto;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 246, 236, 0.35);
+  background: rgba(26, 16, 56, 0.4);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  color: var(--ink);
+  font-size: 1.15rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: transform 0.12s, filter 0.12s;
+}
+#mute-btn:hover { transform: scale(1.08); filter: brightness(1.15); }
 
 /* ── credit ── */
 #credit {
